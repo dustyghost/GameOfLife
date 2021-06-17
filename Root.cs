@@ -3,40 +3,100 @@ using Godot;
 
 public class Root : Node2D
 {
-    const int gridBoxSize = 4;
-    const int boxBorderSize = 1;
-    Color activeColor = new Color(1, 0, 0);
-    Color inActiveColor = new Color(0, 0, 0);
-    Vector2 _screenSize = new Vector2(600, 600);
-    bool[,] mainContainer;
+	const int CELLSCALE = 8;
+	const int BORDERSIZE = 1;
+	const int FRAMESKIP = 4;
+	Color inActiveColor = new Color(0, 0, 0);
+	Cell[,] mainContainer;
+	public int Framecount = 0;
 
 	public override void _Draw()
 	{
-        var screenrect = new Rect2(new Vector2(0, 0), new Vector2(_screenSize.x, _screenSize.y));
-        DrawRect(screenrect, inActiveColor);
+		var viewSize = GetViewport().Size;
+		Vector2 gridSize = new Vector2(viewSize.x / CELLSCALE, viewSize.y / CELLSCALE);
+		var screenrect = new Rect2(new Vector2(0, 0), new Vector2(viewSize.x, viewSize.x));
+		DrawRect(screenrect, inActiveColor);
 
-        for (int x = 0; x < _screenSize.x; x += gridBoxSize)
-        {
-            for (int y = 0; y < _screenSize.y; y += gridBoxSize)
-            {
-                var rect = new Rect2(new Vector2(x+boxBorderSize, y+boxBorderSize), new Vector2(gridBoxSize-(boxBorderSize*2), gridBoxSize-(boxBorderSize*2)));
-                var outputCol = mainContainer[x, y] ? activeColor : inActiveColor;
-                DrawRect(rect, activeColor);
-            }
-        }
+		var workingContainer = new Cell[(int)gridSize.x, (int)gridSize.y];
+
+		for (int x = 0; x < gridSize.x; x++)
+		{
+			for (int y = 0; y < gridSize.y; y++)
+			{
+				var ws = workingContainer[x, y] = new Cell
+				{
+					Active = mainContainer[x, y].Active,
+					Age = mainContainer[x, y].Age,
+				};
+
+				//Check adjacent counts
+				var adjacentCount = 0;
+				for (int cellx = (x - 1); cellx <= (x + 1); cellx++)
+				{
+					for (int celly = (y - 1); celly <= (y + 1); celly++)
+					{
+						//ignore own cell
+						if (!(cellx == x && celly == y))
+						{
+							//establish if edge
+							var cx = cellx < 0 ? gridSize.x - 1 : cellx > gridSize.x - 1 ? 0 : cellx;
+							var cy = celly < 0 ? gridSize.y - 1 : celly > gridSize.y - 1 ? 0 : celly;
+
+							adjacentCount += mainContainer[(int)cx, ((int)cy)].Active ? 1 : 0;
+						}
+					}
+				}
+
+				if ((mainContainer[x, y].Active && adjacentCount == 2 || adjacentCount == 3))
+				{
+					ws.Active = true;
+					ws.Age = (ws.Age + 1) < 99 ? (ws.Age + 1) : 99;
+				}
+				else if (!mainContainer[x, y].Active && adjacentCount == 3)
+				{
+					ws.Active = true;
+					ws.Age = 1;
+				}
+				else
+				{
+					ws.Active = false;
+					ws.Age = 1;
+				}
+				if (ws.Active)
+				{
+					var rect = new Rect2(new Vector2(x * CELLSCALE + BORDERSIZE, y * CELLSCALE + BORDERSIZE), new Vector2(CELLSCALE - BORDERSIZE, CELLSCALE - BORDERSIZE));
+					float ageCol = (ws.Age / 100);
+					var outputCol = new Color(0.5f, ageCol, ageCol);
+					DrawRect(rect, outputCol);
+
+				}
+			}
+		}
+
+		mainContainer = workingContainer;
 	}
 
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
-        mainContainer = new bool[(int)_screenSize.x,(int)_screenSize.y];
-        mainContainer[20,20] = true;
-        mainContainer[60,20] = true;
+		var viewSize = GetViewport().Size;
+		Vector2 gridSize = new Vector2(viewSize.x / CELLSCALE, viewSize.y / CELLSCALE);
+		mainContainer = new Cell[(int)gridSize.x, (int)gridSize.y];
+		Random rnd1 = new Random();
+		for (int x = 0; x < gridSize.x; x += 1)
+		{
+			for (int y = 0; y < gridSize.y; y += 1)
+			{
+				mainContainer[x, y] = new Cell { Active = (rnd1.Next() % 2) == 1 };
+			}
+		}
 	}
 
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(float delta)
 	{
-		Update();
+		Framecount++;
+		if (Framecount % FRAMESKIP == 0)
+			Update();
 	}
 }

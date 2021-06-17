@@ -48,6 +48,6 @@ export.cfg
 
 # Studio and mono -specific ignores #
 ###########################
-*/.vs
-*/.mono
+.vs
+.vscode
 .mono
